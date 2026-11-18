@@ -133,6 +133,14 @@ th{color:var(--mut);font-weight:600}
   <div class="card"><canvas id="cStrainTrend" height="140"></canvas></div>
   <h2>HRV-Trend (30 Tage)</h2>
   <div class="card"><canvas id="cHrvTrend" height="140"></canvas><div class="small mut">Linie = HRV, Fläche = dein normaler Bereich</div></div>
+  <div id="whoopSec" style="display:none">
+  <h2>Dein Whoop-Jahr (Abo-Daten)</h2>
+  <div class="card"><div class="grid" id="wStats"></div></div>
+  <h2>Recovery pro Monat (Whoop)</h2>
+  <div class="card"><canvas id="cWMonth" height="150"></canvas></div>
+  <h2>Was deine Recovery beeinflusst hat</h2>
+  <div class="card" id="wJournal"></div>
+  </div>
   <h2>Recovery-Messungen</h2>
   <div class="card list" id="rList"><span class="mut">Noch keine.</span></div>
 </section>
@@ -151,6 +159,7 @@ th{color:var(--mut);font-weight:600}
   <div class="card">
     <b>Daten</b>
     <button class="full" style="margin-top:10px" id="dExport">Backup exportieren (JSON)</button>
+    <label style="margin-top:12px">Whoop-Export importieren (CSV-Dateien, mehrere auswählen)</label><input type="file" id="wImport" accept=".csv,text/csv" multiple>
     <label style="margin-top:12px">Backup importieren</label><input type="file" id="dImport" accept=".json,application/json">
     <button class="full" style="margin-top:10px" id="dDemo">Demo-Daten erzeugen (zum Testen)</button>
     <button class="full" style="margin-top:10px" id="dLiveDemo">Live-Demo ohne Band</button>
@@ -251,7 +260,10 @@ const rrOf = samples => cleanRR(samples.flatMap(s => s.rr || []));
 
 /* Recovery: HRV (70 %) + Ruhepuls (30 %) gegen deinen persönlichen Normalbereich */
 function recoveryOf(m, all) {
-  const prior = latestPerDay(all.filter(x => x.date < m.date)).slice(-30);
+  if (m.src === "Whoop") return { score: m.whoopRec ?? null, days: 99, base: {}, whoop: true };
+  const before = latestPerDay(all.filter(x => x.date < m.date));
+  const own = before.filter(x => x.src !== "Whoop");
+  const prior = own.slice(-30); // Whoop misst im Schlaf – andere Methode, daher nicht als Basis
   const hv = prior.filter(p => p.rmssd).map(p => Math.log(p.rmssd)), hr = prior.map(p => p.rhr).filter(Boolean);
   let z = 0, w = 0, base = {};
   if (m.rmssd && hv.length >= 3) { const mu = mean(hv), sd = Math.max(std(hv), 0.08); z += 0.7 * (Math.log(m.rmssd) - mu) / sd; w += 0.7; base.hrv = Math.exp(mu); base.hrvLo = Math.exp(mu - sd * .5); base.hrvHi = Math.exp(mu + sd * .5); }
@@ -265,7 +277,7 @@ function recoveryOf(m, all) {
   z /= w;
   return { score: Math.round(clamp(100 / (1 + Math.exp(-(1.1 * z + 0.4))), 1, 99)), z, calib: days < 7, days, base };
 }
-function latestPerDay(arr) { const m = {}; arr.forEach(x => { if (!m[x.date] || m[x.date].ts < x.ts) m[x.date] = x; }); return Object.values(m).sort((a, b) => a.ts - b.ts); }
+function latestPerDay(arr) { const m = {}; arr.forEach(x => { const o = m[x.date]; if (!o || (o.src === "Whoop" && x.src !== "Whoop") || ((o.src === "Whoop") === (x.src === "Whoop") && o.ts < x.ts)) m[x.date] = x; }); return Object.values(m).sort((a, b) => a.ts - b.ts); }
 const recColor = s => s == null ? css("--mut") : s >= 67 ? css("--g") : s >= 34 ? css("--y") : css("--r");
 const recWord = s => s == null ? "–" : s >= 67 ? "Bereit für Belastung" : s >= 34 ? "Moderat belasten" : "Erholung priorisieren";
 
@@ -499,6 +511,7 @@ async function saveTraining() {
 let _shText = "";
 async function openTraining(id) {
   const t = window._trains.find(x => x.id === id); if (!t) return;
+  if (t.src === "Whoop") return openWhoopTraining(t);
   const s = await DB.range(t.start, t.end); const R = analyze(s, t.start, t.end);
   const prev = window._trains.filter(x => x.type === t.type && x.start < t.start && x.strain).slice(-5);
   const I = insights(t, R, prev);
@@ -587,6 +600,7 @@ async function refresh() {
   const ses = await DB.all("sessions");
   window._recs = ses.filter(s => s.kind === "recovery").sort((a, b) => a.ts - b.ts);
   window._trains = ses.filter(s => s.kind === "training").sort((a, b) => a.start - b.start);
+  window._days = ses.filter(s => s.kind === "day"); window._journal = ses.filter(s => s.kind === "journal");
   const recs = window._recs, today = ymd(Date.now());
   const todayRec = latestPerDay(recs).filter(r => r.date === today).pop();
   // Heute
@@ -624,14 +638,16 @@ async function refresh() {
   document.querySelectorAll("[data-tr]").forEach(el => el.onclick = () => openTraining(el.dataset.tr));
   // Verlauf
   const sd = days.map(d => ({ l: d.slice(8), v: 0 }));
-  window._trains.forEach(t => { const i = days.indexOf(t.date); if (i >= 0) sd[i].v = Math.max(sd[i].v, 0) + (t.strain || 0); });
+  window._trains.forEach(t => { const i = days.indexOf(t.date); if (i >= 0 && t.src !== "Whoop") sd[i].v = Math.max(sd[i].v, 0) + (t.strain || 0); });
+  window._days.forEach(d => { const i = days.indexOf(d.date); if (i >= 0 && !sd[i].v) sd[i].v = d.strain; });
   sd.forEach(x => { x.v = x.v ? Math.min(21, r1(x.v)) : null; });
   drawBars($("cStrainTrend"), sd, 21, () => css("--b"), v => v);
-  drawHrvTrend($("cHrvTrend"), per);
+  drawHrvTrend($("cHrvTrend"), per.filter(r => r.src !== "Whoop").length >= 2 ? per.filter(r => r.src !== "Whoop") : per);
+  renderWhoop(per);
   $("rList").innerHTML = per.length ? [...per].reverse().slice(0, 40).map(r => { const R = recoveryOf(r, recs); return `<div class="it"><div><b>${dmy(r.ts)}</b> <span class="mut small">${r.src}${r.sleepMin ? " · " + Math.floor(r.sleepMin / 60) + ":" + pad(r.sleepMin % 60) + " h" : ""}</span><div class="small mut">HRV ${r.rmssd ? Math.round(r.rmssd) + " ms" : "–"} · RHR ${r.rhr}</div></div><b style="color:${recColor(R.score)}">${R.score ?? "–"}%</b></div>`; }).join("") : `<span class="mut">Noch keine.</span>`;
   $("dInfo").textContent = `${recs.length} Recovery-Messungen, ${window._trains.length} Trainings gespeichert.`;
 }
-function trainRow(t) { return `<div class="it" data-tr="${t.id}" style="cursor:pointer"><div><b>${t.type}</b><div class="small mut">${dmy(t.start)} ${hm(t.start)}–${hm(t.end)} · Ø ${t.avg || "–"} bpm · ${t.peaks ?? 0} Spitzen</div></div><div style="text-align:right"><b style="font-size:20px">${t.strain || "–"}</b><div class="small mut">Strain ›</div></div></div>`; }
+function trainRow(t) { return `<div class="it" data-tr="${t.id}" style="cursor:pointer"><div><b>${t.type}</b>${t.src === "Whoop" ? ' <span class="pill" style="font-size:10px">Whoop</span>' : ""}<div class="small mut">${dmy(t.start)}${new Date(t.start).getFullYear() !== new Date().getFullYear() ? new Date(t.start).getFullYear() : ""} ${hm(t.start)}–${hm(t.end)} · Ø ${t.avg || "–"} bpm${t.peaks != null ? " · " + t.peaks + " Spitzen" : ""}</div></div><div style="text-align:right"><b style="font-size:20px">${t.strain || "–"}</b><div class="small mut">Strain ›</div></div></div>`; }
 
 function go(p) { document.querySelectorAll(".page").forEach(x => x.classList.toggle("on", x.id === "p-" + p)); document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.p === p)); window.scrollTo(0, 0); if (p === "hist" || p === "heute") refresh(); }
 
@@ -667,6 +683,127 @@ async function makeDemo() {
   await DB.putMany("sessions", ses); toast("Demo-Daten erzeugt"); refresh(); go("heute");
 }
 
+/* ===================== Whoop-Export ===================== */
+function parseCSV(txt) {
+  const rows = []; let row = [], f = "", q = false;
+  txt = txt.replace(/^﻿/, "");
+  for (let i = 0; i < txt.length; i++) {
+    const c = txt[i];
+    if (q) { if (c === '"') { if (txt[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && txt[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  const h = rows.shift() || [];
+  return rows.filter(r => r.length > 1).map(r => Object.fromEntries(h.map((k, i) => [k.trim(), (r[i] || "").trim()])));
+}
+// Spalten in Deutsch und Englisch (je nach App-Sprache beim Export)
+const WK = {
+  cs: ["Startzeit des Zyklus", "Cycle start time"], tz: ["Zeitzone des Zyklus", "Cycle timezone"],
+  rec: ["Erholungswert %", "Recovery score %"], rhr: ["Ruheherzfrequenz (Schläge pro Minute)", "Resting heart rate (bpm)"],
+  hrv: ["Herzfrequenzvariabilität (ms)", "Heart rate variability (ms)"], skin: ["Hauttemperatur (Celsius)", "Skin temp (celsius)"],
+  spo2: ["Blutsauerstoff %", "Blood oxygen %"], dstrain: ["Tagesbelastung", "Day Strain"], kcal: ["Verbrannte Energie (cal)", "Energy burned (cal)"],
+  wake: ["Beginn des Aufwachens", "Wake onset"], sleepOn: ["Beginn des Schlafs", "Sleep onset"], perf: ["Schlafleistung %", "Sleep performance %"],
+  resp: ["Atemfrequenz (Atemzüge/Min.)", "Respiratory rate (rpm)"], sleep: ["Schlafdauer (Min.)", "Asleep duration (min)"],
+  deep: ["Dauer des Tiefschlafs (Min.)", "Deep (SWS) duration (min)"], rem: ["Dauer des REM-Schlafs (Min.)", "REM duration (min)"],
+  need: ["Schlafbedarf (Min.)", "Sleep need (min)"],
+  ws: ["Startzeit des Trainings", "Workout start time"], we: ["Endzeit des Trainings", "Workout end time"], act: ["Name der Aktivität", "Activity name"],
+  astrain: ["Aktivitätsbelastung", "Activity Strain"], max: ["Max HF (Schläge pro Minute)", "Max HR (bpm)"], avg: ["Durchschnittliche HF (Schläge pro Minute)", "Average HR (bpm)"],
+  q: ["Fragetext", "Question text"], yes: ["Beantwortet mit Ja", "Answered yes"]
+};
+const wv = (r, k) => { for (const n of WK[k]) if (r[n] !== undefined) return r[n]; return ""; };
+const wn = (r, k) => { const v = parseFloat(wv(r, k)); return isNaN(v) ? null : v; };
+function wTime(str, tz) {
+  if (!str) return null;
+  let off = "Z"; const m = /UTC([+-]\d{2}:\d{2})/.exec(tz || ""); if (m) off = m[1];
+  const t = Date.parse(str.replace(" ", "T") + off); return isNaN(t) ? null : t;
+}
+const wDay = (r) => { const w = wTime(wv(r, "wake"), wv(r, "tz")); const c = wTime(wv(r, "cs"), wv(r, "tz")); return ymd(w || (c + 6 * 3600000)); };
+const ACT = { "Handball": "Handball-Training", "Laufen": "Lauf", "Gewichtheben": "Gym", "Funktionelles Training": "Gym", "Radfahren": "Rad", "Spin": "Rad", "Mountainbiken": "Rad",
+  "Running": "Lauf", "Weightlifting": "Gym", "Functional Fitness": "Gym", "Cycling": "Rad", "Spin": "Rad" };
+async function importWhoop(files) {
+  const out = [], cyc = {}; let nR = 0, nW = 0, nJ = 0;
+  const texts = await Promise.all(files.map(f => f.text()));
+  const tables = texts.map(parseCSV);
+  // zuerst Zyklen (für Zuordnung der Logbuch-Einträge)
+  tables.forEach(rows => {
+    if (!rows.length || wv(rows[0], "rec") === undefined || !(WK.rec.some(k => k in rows[0]))) return;
+    rows.forEach(r => {
+      const cs = wv(r, "cs"); if (!cs) return; const date = wDay(r); cyc[cs] = date;
+      const ds = wn(r, "dstrain"); if (ds != null) out.push({ id: "day-" + date, kind: "day", date, strain: ds, kcal: wn(r, "kcal"), src: "Whoop" });
+      const rec = wn(r, "rec"); if (rec == null) return;
+      const ts = wTime(wv(r, "wake"), wv(r, "tz")) || wTime(cs, wv(r, "tz"));
+      out.push({ id: "whoop-" + cs, kind: "recovery", src: "Whoop", ts, date, whoopRec: rec, rmssd: wn(r, "hrv"), rhr: wn(r, "rhr"),
+        skin: wn(r, "skin"), spo2: wn(r, "spo2"), resp: wn(r, "resp"), sleepMin: wn(r, "sleep"), sleepPerf: wn(r, "perf"), deep: wn(r, "deep"), rem: wn(r, "rem"), need: wn(r, "need"), dayStrain: ds });
+      nR++;
+    });
+  });
+  tables.forEach(rows => {
+    if (!rows.length) return; const r0 = rows[0];
+    if (WK.astrain.some(k => k in r0)) rows.forEach(r => {
+      const tz = wv(r, "tz"), a = wTime(wv(r, "ws"), tz), b = wTime(wv(r, "we"), tz); if (!a) return;
+      const name = wv(r, "act"); const z = [1, 2, 3, 4, 5].map(i => parseFloat(r["HF-Zone " + i + " %"] ?? r["HR Zone " + i + " %"]) || 0);
+      out.push({ id: "whoopw-" + a, kind: "training", src: "Whoop", type: ACT[name] || name, whoopName: name, start: a, end: b || a, date: ymd(a),
+        strain: wn(r, "astrain"), avg: wn(r, "avg"), max: wn(r, "max"), kcal: wn(r, "kcal"), zonesPct: z });
+      nW++;
+    });
+    else if (WK.q.some(k => k in r0)) rows.forEach(r => {
+      const cs = wv(r, "cs"), q = wv(r, "q"); if (!cs || !q) return;
+      out.push({ id: "j-" + cs + "-" + q, kind: "journal", date: cyc[cs] || ymd(wTime(cs, wv(r, "tz")) + 6 * 3600000), q, yes: /true|ja|yes/i.test(wv(r, "yes")) });
+      nJ++;
+    });
+  });
+  if (!out.length) { toast("Keine Whoop-Daten erkannt. Bitte die CSV-Dateien aus dem Export wählen.", 4500); return; }
+  await DB.putMany("sessions", out);
+  toast(`Importiert: ${nR} Recovery-Tage, ${nW} Trainings, ${nJ} Logbuch-Einträge`, 4500);
+  await refresh(); go("hist");
+}
+function openWhoopTraining(t) {
+  const prev = window._trains.filter(x => x.type === t.type && x.start < t.start && x.strain).slice(-5);
+  const z = t.zonesPct || [0, 0, 0, 0, 0], dur = Math.round((t.end - t.start) / 60000);
+  const zbar = z.map((v, i) => `<div style="width:${v}%;background:var(--z${i + 1})"></div>`).join("");
+  const zrows = z.map((v, i) => `<tr><td><span class="dot" style="background:var(--z${i + 1})"></span> Whoop-Zone ${i + 1}</td><td>${Math.round(v / 100 * dur)} min</td><td>${Math.round(v)} %</td></tr>`).reverse().join("");
+  const rec = window._recs.find(r => r.date === t.date);
+  const I = [];
+  if (prev.length) { const ps = mean(prev.map(p => p.strain)); I.push(["Vergleich", `Strain ${t.strain} vs. Ø ${r1(ps)} der ${prev.length} Einheiten „${t.type}“ davor.`]); }
+  if (z[3] + z[4] > 0) I.push(["Intensität", `${Math.round(z[3] + z[4])} % der Zeit in Zone 4–5.`]);
+  if (rec) I.push(["Recovery an dem Tag", `${rec.whoopRec ?? "–"} % (HRV ${rec.rmssd ?? "–"} ms, Ruhepuls ${rec.rhr ?? "–"}).`]);
+  $("shBody").innerHTML = `<h1 style="margin-top:14px">${t.type}</h1>
+    <div class="mut" style="margin:-8px 2px 12px">${dmy(t.start)}${new Date(t.start).getFullYear()} · ${hm(t.start)}–${hm(t.end)} Uhr · aus Whoop-Abo${t.whoopName && t.whoopName !== t.type ? " („" + esc(t.whoopName) + "“)" : ""}</div>
+    <div class="card"><div class="grid3">
+      <div class="stat"><div class="k">Strain</div><div class="v">${t.strain ?? "–"}</div></div>
+      <div class="stat"><div class="k">Ø Puls</div><div class="v">${t.avg ?? "–"}</div></div>
+      <div class="stat"><div class="k">Max</div><div class="v">${t.max ?? "–"}</div></div>
+      <div class="stat"><div class="k">kcal</div><div class="v">${t.kcal != null ? Math.round(t.kcal) : "–"}</div></div>
+      <div class="stat"><div class="k">Dauer</div><div class="v">${dur}<small> min</small></div></div>
+    </div></div>
+    ${I.length ? `<h2>Auswertung</h2><div class="card" style="padding:8px">${I.map(x => `<div class="ins"><b>${x[0]}</b>${x[1]}</div>`).join("")}</div>` : ""}
+    <h2>Zonen (Whoop)</h2><div class="card"><div class="zbar">${zbar}</div><table>${zrows}</table></div>
+    <p class="small mut">Importiert aus dem Whoop-Export: Es gibt nur Zusammenfassungen, keine Pulskurve.</p>`;
+  $("sheet").classList.add("on"); $("sheet").scrollTop = 0;
+  _shText = `Whoop-Training: ${t.type}, ${dmy(t.start)}${new Date(t.start).getFullYear()} ${hm(t.start)}–${hm(t.end)}, ${dur} min, Strain ${t.strain}, Ø ${t.avg} bpm, max ${t.max}, kcal ${t.kcal}, Zonen 1–5 %: ${z.join("/")}`;
+}
+function renderWhoop(per) {
+  const w = per.filter(r => r.src === "Whoop"); $("whoopSec").style.display = w.length ? "" : "none"; if (!w.length) return;
+  const avg = k => { const a = w.map(r => r[k]).filter(v => v != null); return a.length ? mean(a) : null; };
+  const hb = window._trains.filter(t => t.src === "Whoop" && /Handball/.test(t.type));
+  const runs = window._trains.filter(t => t.src === "Whoop" && t.type === "Lauf");
+  const st = (k, v, u = "") => `<div class="stat"><div class="k">${k}</div><div class="v">${v}<small>${u}</small></div></div>`;
+  $("wStats").innerHTML = st("Ø Recovery", Math.round(avg("whoopRec")), " %") + st("Ø HRV", Math.round(avg("rmssd")), " ms") + st("Ø Ruhepuls", Math.round(avg("rhr")), " bpm")
+    + st("Ø Schlaf", (() => { const m = avg("sleepMin"); return Math.floor(m / 60) + ":" + pad(Math.round(m % 60)); })(), " h")
+    + st("Handball-Einheiten", hb.length, hb.length ? ` · Ø ${r1(mean(hb.map(t => t.strain)))}` : "") + st("Läufe", runs.length, runs.length ? ` · Ø ${r1(mean(runs.map(t => t.strain)))}` : "");
+  const mon = {}; w.forEach(r => { const k = r.date.slice(0, 7); (mon[k] = mon[k] || []).push(r.whoopRec); });
+  const keys = Object.keys(mon).sort().slice(-13);
+  drawBars($("cWMonth"), keys.map(k => ({ l: k.slice(5), v: Math.round(mean(mon[k])) })), 100, recColor, v => v);
+  // Logbuch: Recovery an Tagen mit Ja vs. Nein
+  const recBy = {}; w.forEach(r => recBy[r.date] = r.whoopRec);
+  const qs = {}; window._journal.forEach(j => { const r = recBy[j.date]; if (r == null) return; (qs[j.q] = qs[j.q] || { y: [], n: [] })[j.yes ? "y" : "n"].push(r); });
+  const res = Object.entries(qs).filter(([, v]) => v.y.length >= 4 && v.n.length >= 4).map(([q, v]) => ({ q, d: mean(v.y) - mean(v.n), ny: v.y.length, nn: v.n.length })).sort((a, b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 8);
+  $("wJournal").innerHTML = res.length ? res.map(r => `<div class="it" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)"><div style="padding-right:10px">${esc(r.q.replace(/\?$/, ""))}<div class="small mut">Ja ${r.ny}× · Nein ${r.nn}×</div></div><b style="color:${r.d >= 0 ? css("--g") : css("--r")};white-space:nowrap">${r.d >= 0 ? "+" : ""}${Math.round(r.d)} %</b></div>`).join("") + `<p class="small mut">Durchschnittliche Recovery an Tagen mit „Ja“ verglichen mit „Nein“. Wenige Tage – nur Hinweise, keine Beweise.</p>` : `<span class="mut small">Zu wenige Logbuch-Einträge für einen Vergleich.</span>`;
+}
+
 /* ===================== Export / Import ===================== */
 async function exportAll() {
   await flush();
@@ -700,7 +837,7 @@ async function init() {
   $("sAge").onchange = () => { if (!$("sMax").dataset.touched) $("sMax").value = Math.round(208 - 0.7 * +$("sAge").value); };
   $("sMax").oninput = () => $("sMax").dataset.touched = 1;
   $("sSave").onclick = () => { S = { age: +$("sAge").value || 25, w: +$("sW").value || 75, sex: $("sSex").value, max: +$("sMax").value || 190, rest: $("sRest").value }; saveSet(); toast("Gespeichert"); refresh(); };
-  $("dExport").onclick = exportAll; $("dImport").onchange = e => e.target.files[0] && importAll(e.target.files[0]);
+  $("wImport").onchange = e => e.target.files.length && importWhoop([...e.target.files]); $("dExport").onclick = exportAll; $("dImport").onchange = e => e.target.files[0] && importAll(e.target.files[0]);
   $("dDemo").onclick = makeDemo; $("dLiveDemo").onclick = toggleLiveDemo;
   $("dWipe").onclick = async () => { if (confirm("Wirklich ALLE Daten löschen?") && confirm("Sicher? Das kann nicht rückgängig gemacht werden.")) { await DB.clear(); refresh(); toast("Gelöscht"); } };
   if (!navigator.bluetooth) $("connSub").textContent = "Dieser Browser kann kein Bluetooth – auf dem iPhone in „Bluefy“ öffnen.";
