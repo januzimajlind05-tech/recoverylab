@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d10">
+<title>Recovery Lab</title>
+<style>
+:root{--bg:#0b0d10;--card:#151920;--card2:#1c2129;--line:#262c36;--txt:#eef1f5;--mut:#8b94a3;
+--g:#2fd27a;--y:#f5c84c;--r:#ff5a5f;--b:#4da3ff;--z0:#5b6472;--z1:#4da3ff;--z2:#2fd27a;--z3:#f5c84c;--z4:#ff9f43;--z5:#ff5a5f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif}
+body{padding:calc(env(safe-area-inset-top) + 8px) 14px calc(env(safe-area-inset-bottom) + 84px)}
+h1{font-size:22px;margin:6px 2px 12px;letter-spacing:-.02em}
+h2{font-size:13px;font-weight:600;color:var(--mut);margin:18px 4px 8px}
+.card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center}.sp{justify-content:space-between}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--card2);border-radius:14px;padding:12px}
+.stat .k{font-size:12px;color:var(--mut)}.stat .v{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:12px;color:var(--mut);font-weight:500}
+.mut{color:var(--mut)}.small{font-size:12.5px}
+button{font:inherit;border:0;border-radius:12px;padding:12px 14px;background:var(--card2);color:var(--txt);font-weight:600}
+button.pri{background:var(--txt);color:#0b0d10}button.dang{color:var(--r)}button.full{width:100%}
+button:disabled{opacity:.4}
+input,select,textarea{font:inherit;color:var(--txt);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}
+label{font-size:12px;color:var(--mut);display:block;margin:10px 0 4px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:rgba(11,13,16,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;background:none;border-radius:0;padding:10px 0 12px;color:var(--mut);font-size:11px;font-weight:600}
+nav button svg{display:block;margin:0 auto 3px;width:22px;height:22px}
+nav button.on{color:var(--txt)}
+.page{display:none}.page.on{display:block}
+.ring{position:relative;width:190px;height:190px;margin:4px auto 8px}
+.ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .c b{font-size:48px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--card2)}
+.big{font-size:72px;font-weight:700;letter-spacing:-.04em;text-align:center;font-variant-numeric:tabular-nums;line-height:1}
+canvas{width:100%;display:block}
+.list .it{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-bottom:1px solid var(--line)}
+.list .it:last-child{border:0}
+.zbar{display:flex;height:10px;border-radius:6px;overflow:hidden;margin:8px 0}
+.ins{padding:10px 12px;border-radius:12px;background:var(--card2);margin-top:8px;font-size:14px}
+.ins b{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-bottom:2px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--r)}
+.dot.on{background:var(--g)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:var(--txt);color:#000;padding:10px 16px;border-radius:12px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:9;max-width:90%}
+#toast.on{opacity:1}
+.sheet{position:fixed;inset:0;background:var(--bg);z-index:8;overflow:auto;padding:calc(env(safe-area-inset-top) + 8px) 14px 40px;display:none}
+.sheet.on{display:block}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+td,th{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line)}td:first-child,th:first-child{text-align:left}
+th{color:var(--mut);font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- HEUTE -->
+<section class="page on" id="p-heute">
+  <div class="row sp"><h1>Heute</h1><span class="small mut" id="connMini"><span class="dot" id="dotMini"></span> getrennt</span></div>
+  <div class="card">
+    <div class="ring"><svg viewBox="0 0 200 200" width="190" height="190"><circle cx="100" cy="100" r="86" stroke="#232933" stroke-width="14" fill="none"/>
+      <circle id="ringArc" cx="100" cy="100" r="86" stroke="#2fd27a" stroke-width="14" fill="none" stroke-linecap="round" transform="rotate(-90 100 100)" stroke-dasharray="0 999"/></svg>
+      <div class="c"><b id="recVal">–</b><span class="mut small">Recovery</span></div></div>
+    <div style="text-align:center"><span class="pill" id="recState">Noch keine Messung heute</span></div>
+    <div class="grid" style="margin-top:14px">
+      <div class="stat"><div class="k">HRV (RMSSD)</div><div class="v" id="hHrv">–</div><div class="small mut" id="hHrvB"></div></div>
+      <div class="stat"><div class="k">Ruhepuls</div><div class="v" id="hRhr">–</div><div class="small mut" id="hRhrB"></div></div>
+    </div>
+    <button class="pri full" style="margin-top:12px" id="btnMorning">Morgenmessung starten (3 Min.)</button>
+    <p class="small mut" style="margin:8px 2px 0">Direkt nach dem Aufwachen, liegend, ruhig atmen. Oder abends die Nachtmessung starten (Tab Live).</p>
+  </div>
+  <div class="grid">
+    <div class="card" style="margin:0"><div class="k small mut">Tages-Strain</div><div style="font-size:30px;font-weight:700" id="hStrain">–</div><div class="small mut">von 21</div></div>
+    <div class="card" style="margin:0"><div class="k small mut">Empfehlung</div><div style="font-size:14px;font-weight:600;margin-top:4px" id="hReco">–</div></div>
+  </div>
+  <h2>Recovery, letzte 14 Tage</h2>
+  <div class="card"><canvas id="cRecTrend" height="140"></canvas></div>
+  <h2>Letztes Training</h2>
+  <div class="card" id="hLast"><span class="mut">Noch kein Training eingetragen.</span></div>
+</section>
+
+<!-- LIVE -->
+<section class="page" id="p-live">
+  <h1>Live</h1>
+  <div class="card">
+    <div class="row sp"><div><span class="dot" id="dot"></span> <b id="connTxt">Nicht verbunden</b><div class="small mut" id="connSub">Whoop: Puls-Übertragung (Broadcast HR) muss aktiv sein</div></div>
+    <button id="btnConn">Verbinden</button></div>
+  </div>
+  <div class="card">
+    <div class="big" id="lHr">--</div>
+    <div style="text-align:center;margin-top:6px"><span class="pill" id="lZone">–</span></div>
+    <div class="grid3" style="margin-top:14px">
+      <div class="stat"><div class="k">HRV 60 s</div><div class="v" id="lHrv">–</div></div>
+      <div class="stat"><div class="k">RR-Daten</div><div class="v" id="lRR">–</div></div>
+      <div class="stat"><div class="k">Heute aufgez.</div><div class="v" id="lRec">–</div></div>
+    </div>
+    <canvas id="cLive" height="150" style="margin-top:12px"></canvas>
+    <div class="small mut">Letzte 10 Minuten</div>
+  </div>
+  <div class="card" id="measureCard" style="display:none">
+    <b id="mTitle">Messung läuft</b><div class="big" style="font-size:44px;margin:10px 0" id="mTime">3:00</div>
+    <div class="small mut" id="mInfo"></div><button class="full dang" style="margin-top:10px" id="mCancel">Abbrechen</button>
+  </div>
+  <div class="grid">
+    <button id="btnTrain">▶ Training starten</button>
+    <button id="btnNight">☾ Nachtmessung</button>
+  </div>
+  <p class="small mut" style="margin:10px 2px">Bluefy muss im Vordergrund bleiben. Display-Sperre wird automatisch verhindert, wenn möglich. Sonst: Einstellungen › Anzeige › Automatische Sperre › Nie.</p>
+</section>
+
+<!-- TRAININGS -->
+<section class="page" id="p-train">
+  <h1>Trainings</h1>
+  <div class="card">
+    <b>Training nachtragen</b>
+    <label>Art</label>
+    <select id="tType"><option>Handball-Training</option><option>Handball-Spiel</option><option>Lauf</option><option>Lauf – Intervalle</option><option>Gym</option><option>Rad</option><option>Sonstiges</option></select>
+    <label>Datum</label><input type="date" id="tDate">
+    <div class="grid"><div><label>Von</label><input type="time" id="tFrom" value="20:00"></div><div><label>Bis</label><input type="time" id="tTo" value="21:00"></div></div>
+    <label>Gefühlte Anstrengung (RPE 1–10): <b id="tRpeV">6</b></label><input type="range" min="1" max="10" value="6" id="tRpe" style="padding:0">
+    <label>Notiz (optional)</label><input id="tNote" placeholder="z. B. viel Gegenstoß, Abschlussspiel 7 gegen 7">
+    <button class="pri full" style="margin-top:14px" id="tSave">Speichern &amp; auswerten</button>
+  </div>
+  <h2>Alle Trainings</h2>
+  <div class="card list" id="tList"><span class="mut">Noch keine.</span></div>
+</section>
+
+<!-- VERLAUF -->
+<section class="page" id="p-hist">
+  <h1>Verlauf</h1>
+  <h2>Strain pro Tag (14 Tage)</h2>
+  <div class="card"><canvas id="cStrainTrend" height="140"></canvas></div>
+  <h2>HRV-Trend (30 Tage)</h2>
+  <div class="card"><canvas id="cHrvTrend" height="140"></canvas><div class="small mut">Linie = HRV, Fläche = dein normaler Bereich</div></div>
+  <h2>Recovery-Messungen</h2>
+  <div class="card list" id="rList"><span class="mut">Noch keine.</span></div>
+</section>
+
+<!-- EINSTELLUNGEN -->
+<section class="page" id="p-set">
+  <h1>Profil &amp; Daten</h1>
+  <div class="card">
+    <div class="grid"><div><label>Alter</label><input type="number" id="sAge"></div><div><label>Gewicht (kg)</label><input type="number" id="sW"></div></div>
+    <div class="grid"><div><label>Geschlecht</label><select id="sSex"><option value="m">männlich</option><option value="f">weiblich</option></select></div>
+    <div><label>Max-Puls</label><input type="number" id="sMax"></div></div>
+    <label>Ruhepuls (leer = automatisch aus Messungen)</label><input type="number" id="sRest" placeholder="auto">
+    <button class="pri full" style="margin-top:14px" id="sSave">Speichern</button>
+    <p class="small mut">Max-Puls kennst du am besten aus einem harten Lauf oder Spiel. Standardwert: 208 − 0,7 × Alter.</p>
+  </div>
+  <div class="card">
+    <b>Daten</b>
+    <button class="full" style="margin-top:10px" id="dExport">Backup exportieren (JSON)</button>
+    <label style="margin-top:12px">Backup importieren</label><input type="file" id="dImport" accept=".json,application/json">
+    <button class="full" style="margin-top:10px" id="dDemo">Demo-Daten erzeugen (zum Testen)</button>
+    <button class="full" style="margin-top:10px" id="dLiveDemo">Live-Demo ohne Band</button>
+    <button class="full dang" style="margin-top:10px" id="dWipe">Alle Daten löschen</button>
+    <p class="small mut" id="dInfo"></p>
+  </div>
+</section>
+
+<!-- TRAINING DETAIL -->
+<div class="sheet" id="sheet">
+  <div class="row sp"><button id="shClose">‹ Zurück</button><button id="shCopy">Für Claude kopieren</button></div>
+  <div id="shBody"></div>
+</div>
+
+<nav>
+  <button class="on" data-p="heute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 8 8"/></svg>Heute</button>
+  <button data-p="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>Live</button>
+  <button data-p="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3v18"/></svg>Trainings</button>
+  <button data-p="hist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Verlauf</button>
+  <button data-p="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</button>
+</nav>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ===================== Helfer ===================== */
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, "0");
+const ymd = d => { d = new Date(d); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+const hm = t => { const d = new Date(t); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+const dmy = t => { const d = new Date(t); return pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "."; };
+const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
+const std = a => { if (a.length < 2) return 0; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
+const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); const i = s.length >> 1; return s.length % 2 ? s[i] : (s[i - 1] + s[i]) / 2; };
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const r1 = x => Math.round(x * 10) / 10;
+function toast(msg, ms = 2400) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), ms); }
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ===================== Einstellungen ===================== */
+const DEF = { age: 25, w: 78, sex: "m", max: 191, rest: "" };
+function loadSet() { try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem("rl_set") || "{}")); } catch (e) { return Object.assign({}, DEF); } }
+let S = loadSet();
+function saveSet() { try { localStorage.setItem("rl_set", JSON.stringify(S)); } catch (e) {} }
+
+/* ===================== Datenbank (IndexedDB) ===================== */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((res, rej) => {
+      const q = indexedDB.open("recoverylab", 1);
+      q.onupgradeneeded = () => {
+        const db = q.result;
+        db.createObjectStore("samples", { keyPath: "ts" });
+        db.createObjectStore("sessions", { keyPath: "id" });
+      };
+      q.onsuccess = () => { DB.db = q.result; res(); };
+      q.onerror = () => rej(q.error);
+    });
+  },
+  tx(store, mode = "readonly") { return DB.db.transaction(store, mode).objectStore(store); },
+  putMany(store, arr) {
+    return new Promise((res, rej) => {
+      const t = DB.db.transaction(store, "readwrite"); const o = t.objectStore(store);
+      arr.forEach(x => o.put(x)); t.oncomplete = res; t.onerror = () => rej(t.error);
+    });
+  },
+  put(store, x) { return DB.putMany(store, [x]); },
+  all(store) { return new Promise((res, rej) => { const q = DB.tx(store).getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
+  range(from, to) { return new Promise((res, rej) => { const q = DB.tx("samples").getAll(IDBKeyRange.bound(from, to)); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
+  count(from, to) { return new Promise(res => { const q = DB.tx("samples").count(IDBKeyRange.bound(from, to)); q.onsuccess = () => res(q.result); q.onerror = () => res(0); }); },
+  del(store, key) { return new Promise(res => { const t = DB.db.transaction(store, "readwrite"); t.objectStore(store).delete(key); t.oncomplete = res; }); },
+  clear() { return new Promise(res => { const t = DB.db.transaction(["samples", "sessions"], "readwrite"); t.objectStore("samples").clear(); t.objectStore("sessions").clear(); t.oncomplete = res; }); }
+};
+
+/* ===================== Physiologie ===================== */
+function restHR() {
+  if (S.rest) return +S.rest;
+  const r = (window._recs || []).slice(-14).map(x => x.rhr).filter(Boolean);
+  return r.length ? Math.round(median(r)) : 60;
+}
+// Herzfrequenzreserve-Anteil (Karvonen)
+const hrr = hr => clamp((hr - restHR()) / (S.max - restHR()), 0, 1.05);
+const ZONES = [
+  { n: "Z0 Ruhe", lo: 0, c: "--z0" }, { n: "Z1 sehr leicht", lo: .5, c: "--z1" }, { n: "Z2 Grundlage", lo: .6, c: "--z2" },
+  { n: "Z3 moderat", lo: .7, c: "--z3" }, { n: "Z4 hart", lo: .8, c: "--z4" }, { n: "Z5 maximal", lo: .9, c: "--z5" }];
+function zoneOf(hr) { const f = hrr(hr); let z = 0; ZONES.forEach((Z, i) => { if (f >= Z.lo) z = i; }); return z; }
+// Banister-TRIMP pro Minute
+function trimpRate(hr) { const f = clamp(hrr(hr), 0, 1); return S.sex === "f" ? f * 0.86 * Math.exp(1.67 * f) : f * 0.64 * Math.exp(1.92 * f); }
+// Strain 0–21 (logarithmische Sättigung, angelehnt an Whoop-Skala)
+const strainOf = trimp => r1(21 * (1 - Math.exp(-trimp / 120)));
+// kcal/min nach Keytel 2005
+function kcalMin(hr) { const A = +S.age, W = +S.w; return Math.max(0, S.sex === "f" ? (-20.4022 + 0.4472 * hr - 0.1263 * W + 0.074 * A) / 4.184 : (-55.0969 + 0.6309 * hr + 0.1988 * W + 0.2017 * A) / 4.184); }
+// RR-Bereinigung: physiologische Grenzen + max. 20 % Sprung
+function cleanRR(rr) { const o = []; for (const x of rr) { if (x < 300 || x > 2000) continue; if (o.length) { const p = o[o.length - 1]; if (Math.abs(x - p) > 0.2 * p) continue; } o.push(x); } return o; }
+function rmssd(rr) { if (rr.length < 20) return null; let s = 0; for (let i = 1; i < rr.length; i++) s += (rr[i] - rr[i - 1]) ** 2; return Math.sqrt(s / (rr.length - 1)); }
+const rrOf = samples => cleanRR(samples.flatMap(s => s.rr || []));
+
+/* Recovery: HRV (70 %) + Ruhepuls (30 %) gegen deinen persönlichen Normalbereich */
+function recoveryOf(m, all) {
+  const prior = latestPerDay(all.filter(x => x.date < m.date)).slice(-30);
+  const hv = prior.filter(p => p.rmssd).map(p => Math.log(p.rmssd)), hr = prior.map(p => p.rhr).filter(Boolean);
+  let z = 0, w = 0, base = {};
+  if (m.rmssd && hv.length >= 3) { const mu = mean(hv), sd = Math.max(std(hv), 0.08); z += 0.7 * (Math.log(m.rmssd) - mu) / sd; w += 0.7; base.hrv = Math.exp(mu); base.hrvLo = Math.exp(mu - sd * .5); base.hrvHi = Math.exp(mu + sd * .5); }
+  if (m.rhr && hr.length >= 3) { const mu = mean(hr), sd = Math.max(std(hr), 1.5); z += 0.3 * -(m.rhr - mu) / sd; w += 0.3; base.rhr = mu; }
+  const days = prior.length;
+  if (!w) {
+    if (!m.rmssd) return { score: null, days, base };
+    const s = 100 * (Math.log(m.rmssd) - Math.log(20)) / (Math.log(110) - Math.log(20));
+    return { score: Math.round(clamp(s, 5, 95)), calib: true, days, base };
+  }
+  z /= w;
+  return { score: Math.round(clamp(100 / (1 + Math.exp(-(1.1 * z + 0.4))), 1, 99)), z, calib: days < 7, days, base };
+}
+function latestPerDay(arr) { const m = {}; arr.forEach(x => { if (!m[x.date] || m[x.date].ts < x.ts) m[x.date] = x; }); return Object.values(m).sort((a, b) => a.ts - b.ts); }
+const recColor = s => s == null ? css("--mut") : s >= 67 ? css("--g") : s >= 34 ? css("--y") : css("--r");
+const recWord = s => s == null ? "–" : s >= 67 ? "Bereit für Belastung" : s >= 34 ? "Moderat belasten" : "Erholung priorisieren";
+
+/* ===================== Auswertung eines Zeitraums ===================== */
+function analyze(samples, t0, t1) {
+  const s = samples.filter(x => x.hr > 30 && x.hr < 240);
+  const R = { n: s.length, dur: (t1 - t0) / 60000, zones: [0, 0, 0, 0, 0, 0], trimp: 0, kcal: 0, covered: 0, peaks: [], blocks: [] };
+  if (s.length < 2) return R;
+  let hrSum = 0, wSum = 0, mx = 0, mn = 999;
+  for (let i = 0; i < s.length; i++) {
+    const nx = s[i + 1]; let dt = nx ? (nx.ts - s[i].ts) / 1000 : 1; if (dt > 5) dt = 1; // Lücken nicht hochrechnen
+    const h = s[i].hr; R.covered += dt; hrSum += h * dt; wSum += dt; mx = Math.max(mx, h); mn = Math.min(mn, h);
+    R.zones[zoneOf(h)] += dt; R.trimp += trimpRate(h) * dt / 60; R.kcal += kcalMin(h) * dt / 60;
+  }
+  R.avg = hrSum / wSum; R.max = mx; R.min = mn; R.strain = strainOf(R.trimp);
+  R.coverage = clamp(R.covered / ((t1 - t0) / 1000), 0, 1);
+  R.hiPct = (R.zones[4] + R.zones[5]) / R.covered;
+  // Belastungsspitzen: ≥ 88 % HFmax für ≥ 8 s, Ende nach 10 s darunter
+  const thr = 0.88 * S.max; let cur = null;
+  for (const x of s) {
+    if (x.hr >= thr) { if (!cur) cur = { a: x.ts, peak: x.hr, b: x.ts }; cur.b = x.ts; cur.peak = Math.max(cur.peak, x.hr); }
+    else if (cur && x.ts - cur.b > 10000) { if (cur.b - cur.a >= 8000) R.peaks.push(cur); cur = null; }
+  }
+  if (cur && cur.b - cur.a >= 8000) R.peaks.push(cur);
+  // Erholung 60 s nach jeder Spitze
+  R.peaks.forEach(p => {
+    const after = s.find(x => x.ts >= p.b + 60000);
+    if (after && after.ts - p.b < 75000) p.drop = p.peak - after.hr;
+  });
+  const drops = R.peaks.map(p => p.drop).filter(d => d != null);
+  R.recDrop = drops.length ? mean(drops) : null;
+  if (drops.length >= 4) { const h = drops.length >> 1; R.dropEarly = mean(drops.slice(0, h)); R.dropLate = mean(drops.slice(h)); }
+  // 10-Minuten-Blöcke
+  for (let a = t0; a < t1; a += 600000) {
+    const b = Math.min(a + 600000, t1), bs = s.filter(x => x.ts >= a && x.ts < b);
+    if (!bs.length) { R.blocks.push({ a, b, avg: null }); continue; }
+    let tr = 0; bs.forEach((x, i) => { const nx = bs[i + 1]; let dt = nx ? (nx.ts - x.ts) / 1000 : 1; if (dt > 5) dt = 1; tr += trimpRate(x.hr) * dt / 60; });
+    R.blocks.push({ a, b, avg: mean(bs.map(x => x.hr)), max: Math.max(...bs.map(x => x.hr)), trimp: tr, peaks: R.peaks.filter(p => p.a >= a && p.a < b).length });
+  }
+  const rr = rrOf(s); R.rmssd = rmssd(rr);
+  return R;
+}
+
+function insights(t, R, prev) {
+  const I = [], hb = /Handball/.test(t.type);
+  if (R.n < 30) { I.push(["Keine Daten", "Im Zeitraum wurden keine Pulsdaten aufgezeichnet. War Bluefy offen und verbunden?"]); return I; }
+  if (R.coverage < 0.8) I.push(["Datenlücken", `Nur ${Math.round(R.coverage * 100)} % des Zeitraums aufgezeichnet. Werte sind entsprechend unvollständig.`]);
+  const hi = Math.round(R.hiPct * 100);
+  if (hb) {
+    I.push(["Belastungsprofil", R.peaks.length >= 8
+      ? `${R.peaks.length} Belastungsspitzen (≥ 88 % HFmax) – typisch für Spielformen und Gegenstoß-Übungen. ${hi} % der Zeit in Zone 4–5.`
+      : R.peaks.length >= 3 ? `${R.peaks.length} Belastungsspitzen, ${hi} % in Zone 4–5 – eher technik- oder taktiklastige Einheit mit einzelnen intensiven Phasen.`
+      : `Kaum Spitzen (${R.peaks.length}), ${hi} % in Zone 4–5 – lockere Einheit, Technik oder viel Stehzeit.`]);
+    const best = R.blocks.filter(b => b.avg).sort((a, b) => b.trimp - a.trimp)[0];
+    if (best) I.push(["Intensivste Phase", `${hm(best.a)}–${hm(best.b)} Uhr: Ø ${Math.round(best.avg)} bpm, max ${best.max} bpm, ${best.peaks} Spitzen. Vermutlich Abschlussspiel oder Intervall-Übung.`]);
+    if (R.recDrop != null) {
+      const d = Math.round(R.recDrop);
+      I.push(["Erholungsfähigkeit", `Puls fällt nach Spitzen im Schnitt um ${d} bpm in 60 s – ${d >= 30 ? "sehr gut, schnelle Erholung zwischen Aktionen" : d >= 20 ? "solide" : "eher langsam: Ermüdung oder kurze Pausen zwischen Belastungen"}.` +
+        (R.dropLate != null ? ` Erste Hälfte ${Math.round(R.dropEarly)} bpm, zweite ${Math.round(R.dropLate)} bpm${R.dropLate < R.dropEarly - 5 ? " – Ermüdung zum Ende sichtbar." : "."}` : "")]);
+    }
+  } else if (/Lauf/.test(t.type)) {
+    const z2 = Math.round((R.zones[1] + R.zones[2]) / R.covered * 100);
+    I.push(["Intensitätsverteilung", `${z2} % in Zone 1–2, ${hi} % in Zone 4–5.` + (/Intervall/.test(t.type) ? ` ${R.peaks.length} harte Abschnitte erkannt.` : z2 < 60 ? " Für einen lockeren Lauf zu intensiv – für die HM-Grundlage ruhiger laufen." : " Saubere Grundlageneinheit.")]);
+  } else {
+    I.push(["Intensität", `${hi} % der Zeit in Zone 4–5, Ø ${Math.round(R.avg)} bpm.`]);
+  }
+  if (prev.length) {
+    const ps = mean(prev.map(p => p.strain)), diff = R.strain - ps;
+    I.push(["Vergleich", `Strain ${R.strain} vs. Ø ${r1(ps)} deiner letzten ${prev.length} Einheiten „${t.type}“ (${diff >= 0 ? "+" : ""}${r1(diff)}).`]);
+  }
+  if (t.rpe) {
+    const load = t.rpe * Math.round(R.dur);
+    const exp = R.strain >= 14 ? 7 : R.strain >= 10 ? 5 : 3;
+    I.push(["Gefühl vs. Puls", `RPE ${t.rpe} → Trainingslast ${load} AU. ` + (t.rpe - exp >= 3 ? "Fühlte sich deutlich härter an, als der Puls zeigt – Hinweis auf Müdigkeit oder Stress." : exp - t.rpe >= 3 ? "Puls war höher als das Gefühl – gute Tagesform." : "Gefühl und Puls passen zusammen.")]);
+  }
+  I.push(["Morgen", R.strain >= 15 ? "Hohe Belastung: morgen höchstens lockerer Z2-Lauf oder Pause, viel schlafen." : R.strain >= 10 ? "Mittlere Belastung: morgen normales Training möglich, Recovery morgens checken." : "Geringe Belastung: morgen ist eine Qualitätseinheit drin."]);
+  return I;
+}
+
+/* ===================== Bluetooth ===================== */
+const BLE = { dev: null, ch: null, auto: true, connected: false, tries: 0 };
+async function bleConnect() {
+  if (!navigator.bluetooth) { toast("Kein Web Bluetooth. Öffne die Seite in der App „Bluefy“.", 4000); return; }
+  try {
+    BLE.dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ["heart_rate", "battery_service"] });
+    BLE.dev.addEventListener("gattserverdisconnected", onDisc);
+    BLE.auto = true; await gattUp();
+  } catch (e) { if (e.name !== "NotFoundError") toast("Fehler: " + e.message, 4000); setConn(false, e.name === "NotFoundError" ? "Abgebrochen" : e.message); }
+}
+async function gattUp() {
+  setConn(false, "Verbinde …");
+  const srv = await BLE.dev.gatt.connect();
+  let svc;
+  try { svc = await srv.getPrimaryService("heart_rate"); }
+  catch (e) { setConn(false, "Kein Pulsdienst gefunden – Broadcast HR am Whoop aktiv?"); toast("Gerät sendet keinen Puls. Puls-Übertragung am Whoop aktivieren.", 5000); return; }
+  BLE.ch = await svc.getCharacteristic("heart_rate_measurement");
+  await BLE.ch.startNotifications();
+  BLE.ch.addEventListener("characteristicvaluechanged", e => parseHR(e.target.value));
+  BLE.connected = true; BLE.tries = 0; setConn(true, BLE.dev.name || "Gerät");
+  wakeLock();
+  try { const b = await (await srv.getPrimaryService("battery_service")).getCharacteristic("battery_level"); const v = await b.readValue(); $("connSub").textContent = `${BLE.dev.name || "Gerät"} · Akku ${v.getUint8(0)} %`; } catch (e) {}
+}
+function onDisc() {
+  BLE.connected = false; setConn(false, "Verbindung verloren – verbinde neu …");
+  if (!BLE.auto) return;
+  const wait = Math.min(30000, 1000 * 2 ** BLE.tries++);
+  setTimeout(() => gattUp().catch(onDisc), wait);
+}
+function bleDisconnect() { BLE.auto = false; if (BLE.dev && BLE.dev.gatt.connected) BLE.dev.gatt.disconnect(); setConn(false, "Getrennt"); }
+function parseHR(dv) {
+  const f = dv.getUint8(0); let i = 1, hr;
+  if (f & 1) { hr = dv.getUint16(i, true); i += 2; } else { hr = dv.getUint8(i); i += 1; }
+  if (f & 8) i += 2;
+  const rr = [];
+  if (f & 16) while (i + 1 < dv.byteLength) { rr.push(Math.round(dv.getUint16(i, true) / 1024 * 1000)); i += 2; }
+  onSample(hr, rr);
+}
+function setConn(on, sub) {
+  $("dot").classList.toggle("on", on); $("dotMini").classList.toggle("on", on);
+  $("connTxt").textContent = on ? "Verbunden" : "Nicht verbunden";
+  $("connMini").lastChild.textContent = on ? " verbunden" : " getrennt";
+  if (sub) $("connSub").textContent = sub;
+  $("btnConn").textContent = on ? "Trennen" : "Verbinden";
+}
+let _wl = null;
+async function wakeLock() { try { if ("wakeLock" in navigator && !_wl) { _wl = await navigator.wakeLock.request("screen"); _wl.addEventListener("release", () => _wl = null); } } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && BLE.connected) wakeLock(); });
+
+/* ===================== Datenstrom ===================== */
+const LIVE = { buf: [], win: [], lastTs: 0, rrSeen: false, today: 0 };
+function onSample(hr, rr) {
+  if (!hr) return;
+  let ts = Date.now(); if (ts <= LIVE.lastTs) ts = LIVE.lastTs + 1; LIVE.lastTs = ts;
+  const s = { ts, hr }; if (rr.length) { s.rr = rr; LIVE.rrSeen = true; }
+  LIVE.buf.push(s); LIVE.win.push(s); LIVE.today++;
+  const cut = ts - 600000; while (LIVE.win.length && LIVE.win[0].ts < cut) LIVE.win.shift();
+  if (MEAS.on) MEAS.samples.push(s);
+  renderLive();
+}
+setInterval(flush, 5000);
+async function flush() { if (!LIVE.buf.length || !DB.db) return; const b = LIVE.buf; LIVE.buf = []; try { await DB.putMany("samples", b); } catch (e) { LIVE.buf = b.concat(LIVE.buf); } }
+window.addEventListener("pagehide", flush);
+
+let _lr = 0;
+function renderLive() {
+  const now = Date.now(); if (now - _lr < 900) return; _lr = now;
+  const last = LIVE.win[LIVE.win.length - 1]; if (!last) return;
+  $("lHr").textContent = last.hr;
+  const z = zoneOf(last.hr); const zEl = $("lZone"); zEl.textContent = ZONES[z].n + " · " + Math.round(last.hr / S.max * 100) + " % HFmax"; zEl.style.background = css(ZONES[z].c); zEl.style.color = "#000";
+  const rr = rrOf(LIVE.win.filter(x => x.ts > now - 60000)); const v = rmssd(rr);
+  $("lHrv").textContent = v ? Math.round(v) : "–";
+  $("lRR").textContent = LIVE.rrSeen ? "ja" : "nein";
+  $("lRec").textContent = LIVE.today > 3600 ? r1(LIVE.today / 3600) + " h" : Math.round(LIVE.today / 60) + " m";
+  drawHR($("cLive"), LIVE.win, now - 600000, now);
+  if (MEAS.on) renderMeas();
+}
+
+/* ===================== Messungen & Sessions ===================== */
+const MEAS = { on: false, kind: null, t0: 0, samples: [], timer: null };
+function startMorning() {
+  if (!BLE.connected && !DEMO.on) { toast("Erst im Tab Live verbinden."); go("live"); return; }
+  Object.assign(MEAS, { on: true, kind: "morning", t0: Date.now(), samples: [] });
+  $("measureCard").style.display = ""; $("mTitle").textContent = "Morgenmessung – liegen bleiben, ruhig atmen";
+  go("live"); MEAS.timer = setInterval(renderMeas, 1000); renderMeas();
+}
+function renderMeas() {
+  if (!MEAS.on) return;
+  const el = (Date.now() - MEAS.t0) / 1000;
+  if (MEAS.kind === "morning") {
+    const left = Math.max(0, 180 - el); $("mTime").textContent = Math.floor(left / 60) + ":" + pad(Math.floor(left % 60));
+    $("mInfo").textContent = `${MEAS.samples.length} Werte, ${rrOf(MEAS.samples).length} saubere RR-Intervalle`;
+    if (left <= 0) finishMorning();
+  } else {
+    $("mTime").textContent = Math.floor(el / 3600) + ":" + pad(Math.floor(el % 3600 / 60)) + " h";
+    $("mInfo").textContent = "Nachtmessung läuft. iPhone ans Ladekabel, Bluefy offen lassen.";
+  }
+}
+function stopMeas() { MEAS.on = false; clearInterval(MEAS.timer); $("measureCard").style.display = "none"; }
+async function finishMorning() {
+  const s = MEAS.samples; stopMeas(); await flush();
+  const late = s.filter(x => x.ts > MEAS.t0 + 60000); // erste Minute = Einschwingen
+  const rr = rrOf(s.filter(x => x.ts > MEAS.t0 + 30000));
+  const m = { id: "rec-" + Date.now(), kind: "recovery", src: "Morgen", ts: Date.now(), date: ymd(Date.now()), rhr: Math.round(mean((late.length ? late : s).map(x => x.hr))), rmssd: rmssd(rr), rrN: rr.length };
+  if (!m.rhr) { toast("Keine Daten empfangen."); return; }
+  await DB.put("sessions", m); toast(m.rmssd ? "Recovery gespeichert" : "Ohne RR-Daten: Recovery nur aus Ruhepuls", 3500);
+  await refresh(); go("heute");
+}
+async function toggleNight() {
+  if (MEAS.on && MEAS.kind === "night") {
+    const t0 = MEAS.t0, t1 = Date.now(); stopMeas(); await flush();
+    const s = (await DB.range(t0, t1)).filter(x => x.hr > 30);
+    if (s.length < 600) { toast("Zu wenig Daten für eine Nachtmessung."); $("btnNight").textContent = "☾ Nachtmessung"; return; }
+    let best = null, hrvs = [];
+    for (let a = t0; a + 300000 <= t1; a += 150000) {
+      const w = s.filter(x => x.ts >= a && x.ts < a + 300000); if (w.length < 120) continue;
+      const h = mean(w.map(x => x.hr)); if (!best || h < best) best = h;
+      const v = rmssd(rrOf(w)); if (v && a > t0 + (t1 - t0) * 0.4) hrvs.push(v); // zweite Nachthälfte
+    }
+    const m = { id: "rec-" + t1, kind: "recovery", src: "Nacht", ts: t1, date: ymd(t1), rhr: Math.round(best), rmssd: hrvs.length ? median(hrvs) : null, sleepMin: Math.round((t1 - t0) / 60000) };
+    await DB.put("sessions", m); $("btnNight").textContent = "☾ Nachtmessung"; toast("Nachtmessung ausgewertet"); await refresh(); go("heute");
+  } else {
+    if (!BLE.connected && !DEMO.on) { toast("Erst verbinden."); return; }
+    Object.assign(MEAS, { on: true, kind: "night", t0: Date.now(), samples: [] });
+    $("measureCard").style.display = ""; $("mTitle").textContent = "Nachtmessung"; $("btnNight").textContent = "☀ Aufgewacht – beenden";
+    MEAS.timer = setInterval(renderMeas, 1000); renderMeas();
+  }
+}
+let liveTrain = null;
+async function toggleTrain() {
+  if (!liveTrain) {
+    liveTrain = Date.now(); $("btnTrain").textContent = "■ Training beenden"; toast("Training läuft – Art trägst du am Ende ein");
+  } else {
+    const a = liveTrain, b = Date.now(); liveTrain = null; $("btnTrain").textContent = "▶ Training starten"; await flush();
+    go("train"); $("tDate").value = ymd(a); $("tFrom").value = hm(a); $("tTo").value = hm(b + 59000);
+    toast("Zeit übernommen – Art wählen und speichern");
+  }
+}
+async function saveTraining() {
+  const d = $("tDate").value; if (!d) { toast("Datum fehlt"); return; }
+  const a = new Date(d + "T" + $("tFrom").value).getTime(); let b = new Date(d + "T" + $("tTo").value).getTime();
+  if (b <= a) b += 86400000;
+  const t = { id: "tr-" + a, kind: "training", type: $("tType").value, start: a, end: b, rpe: +$("tRpe").value, note: $("tNote").value.trim(), date: d };
+  await flush();
+  const R = analyze(await DB.range(a, b), a, b);
+  t.strain = R.strain || 0; t.avg = R.avg ? Math.round(R.avg) : null; t.max = R.max || null; t.peaks = R.peaks.length; t.kcal = Math.round(R.kcal);
+  await DB.put("sessions", t); $("tNote").value = "";
+  await refresh(); openTraining(t.id);
+}
+
+/* ===================== Training-Detail ===================== */
+let _shText = "";
+async function openTraining(id) {
+  const t = window._trains.find(x => x.id === id); if (!t) return;
+  const s = await DB.range(t.start, t.end); const R = analyze(s, t.start, t.end);
+  const prev = window._trains.filter(x => x.type === t.type && x.start < t.start && x.strain).slice(-5);
+  const I = insights(t, R, prev);
+  if (R.n && R.strain !== t.strain) { Object.assign(t, { strain: R.strain, avg: Math.round(R.avg), max: R.max, peaks: R.peaks.length, kcal: Math.round(R.kcal) }); DB.put("sessions", t); }
+  const zs = R.covered || 1;
+  const zbar = R.zones.map((v, i) => `<div style="width:${v / zs * 100}%;background:var(${ZONES[i].c})"></div>`).join("");
+  const zrows = R.zones.map((v, i) => `<tr><td><span class="dot" style="background:var(${ZONES[i].c})"></span> ${ZONES[i].n}</td><td>${Math.round(v / 60)} min</td><td>${Math.round(v / zs * 100)} %</td></tr>`).reverse().join("");
+  const brows = R.blocks.map(b => `<tr><td>${hm(b.a)}</td><td>${b.avg ? Math.round(b.avg) : "–"}</td><td>${b.max || "–"}</td><td>${b.avg ? b.peaks : "–"}</td><td>${b.avg ? r1(strainOf(b.trimp)) : "–"}</td></tr>`).join("");
+  const rec = window._recs.find(r => r.date === t.date);
+  $("shBody").innerHTML = `
+    <h1 style="margin-top:14px">${t.type}</h1>
+    <div class="mut" style="margin:-8px 2px 12px">${dmy(t.start)} · ${hm(t.start)}–${hm(t.end)} Uhr${t.note ? " · " + esc(t.note) : ""}</div>
+    <div class="card"><div class="grid3">
+      <div class="stat"><div class="k">Strain</div><div class="v">${R.n ? R.strain : "–"}</div></div>
+      <div class="stat"><div class="k">Ø Puls</div><div class="v">${R.avg ? Math.round(R.avg) : "–"}</div></div>
+      <div class="stat"><div class="k">Max</div><div class="v">${R.max || "–"}</div></div>
+      <div class="stat"><div class="k">kcal</div><div class="v">${Math.round(R.kcal)}</div></div>
+      <div class="stat"><div class="k">Spitzen</div><div class="v">${R.peaks.length}</div></div>
+      <div class="stat"><div class="k">Erholung 60 s</div><div class="v">${R.recDrop != null ? Math.round(R.recDrop) : "–"}<small> bpm</small></div></div>
+    </div>
+    <canvas id="cTr" height="170" style="margin-top:12px"></canvas></div>
+    <h2>Auswertung</h2><div class="card" style="padding:8px">${I.map(x => `<div class="ins"><b>${x[0]}</b>${x[1]}</div>`).join("")}</div>
+    <h2>Zonen</h2><div class="card"><div class="zbar">${zbar}</div><table>${zrows}</table></div>
+    <h2>Verlauf in 10-Minuten-Blöcken</h2><div class="card"><table><tr><th>ab</th><th>Ø</th><th>max</th><th>Spitzen</th><th>Strain</th></tr>${brows}</table></div>
+    <button class="full dang" id="shDel">Training löschen</button>`;
+  $("sheet").classList.add("on"); $("sheet").scrollTop = 0;
+  requestAnimationFrame(() => drawHR($("cTr"), s, t.start, t.end, R.peaks));
+  $("shDel").onclick = async () => { if (confirm("Training löschen? Die Pulsdaten bleiben erhalten.")) { await DB.del("sessions", t.id); $("sheet").classList.remove("on"); refresh(); } };
+  _shText = [
+    `Training: ${t.type}, ${dmy(t.start)} ${hm(t.start)}–${hm(t.end)} Uhr${t.note ? " (" + t.note + ")" : ""}`,
+    `Profil: ${S.age} J., ${S.w} kg, HFmax ${S.max}, Ruhepuls ${restHR()}`,
+    rec ? `Recovery an dem Tag: ${recoveryOf(rec, window._recs).score} % (HRV ${rec.rmssd ? Math.round(rec.rmssd) : "–"} ms, RHR ${rec.rhr})` : "",
+    `Dauer ${Math.round(R.dur)} min, Datenabdeckung ${Math.round((R.coverage || 0) * 100)} %`,
+    `Strain ${R.strain}, TRIMP ${Math.round(R.trimp)}, Ø ${Math.round(R.avg || 0)} bpm, max ${R.max}, kcal ${Math.round(R.kcal)}, RPE ${t.rpe}`,
+    `Zonen (min): ` + R.zones.map((v, i) => `Z${i} ${Math.round(v / 60)}`).join(", "),
+    `Belastungsspitzen ≥88% HFmax: ${R.peaks.length}; Ø Pulsabfall 60 s danach: ${R.recDrop != null ? Math.round(R.recDrop) : "–"} bpm`,
+    `10-Min-Blöcke (Start Ø/max/Spitzen): ` + R.blocks.map(b => `${hm(b.a)} ${b.avg ? Math.round(b.avg) : "-"}/${b.max || "-"}/${b.peaks || 0}`).join("; "),
+    prev.length ? `Frühere Einheiten gleicher Art, Strain: ${prev.map(p => p.strain).join(", ")}` : "",
+    "Bitte werte das Training aus und gib mir Tipps für die nächsten Tage (Halbmarathon-Vorbereitung + Handball)."
+  ].filter(Boolean).join("\n");
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ===================== Diagramme ===================== */
+function prep(c) { const dpr = window.devicePixelRatio || 1, w = c.clientWidth || 320, h = +(c.dataset.h || (c.dataset.h = c.getAttribute("height"))); c.width = w * dpr; c.height = h * dpr; c.style.height = h + "px"; const x = c.getContext("2d"); x.scale(dpr, dpr); x.clearRect(0, 0, w, h); x.font = "11px -apple-system,system-ui"; return [x, w, h]; }
+function drawHR(c, s, t0, t1, peaks) {
+  const [x, w, h] = prep(c); const pts = s.filter(p => p.hr > 30); if (pts.length < 2) { x.fillStyle = css("--mut"); x.fillText("Keine Daten", 8, h / 2); return; }
+  let lo = Math.min(...pts.map(p => p.hr)) - 8, hi = Math.max(...pts.map(p => p.hr)) + 8; lo = Math.floor(lo / 10) * 10; hi = Math.ceil(hi / 10) * 10;
+  const L = 28, X = t => L + (t - t0) / (t1 - t0) * (w - L - 4), Y = v => 6 + (1 - (v - lo) / (hi - lo)) * (h - 22);
+  x.strokeStyle = css("--line"); x.fillStyle = css("--mut"); x.lineWidth = 1;
+  for (let v = lo; v <= hi; v += (hi - lo > 80 ? 40 : 20)) { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(w, Y(v)); x.stroke(); x.fillText(v, 2, Y(v) + 4); }
+  x.fillText(hm(t0), L, h - 3); const e = hm(t1); x.fillText(e, w - x.measureText(e).width - 2, h - 3);
+  (peaks || []).forEach(p => { x.fillStyle = "rgba(255,90,95,.13)"; x.fillRect(X(p.a), 6, Math.max(2, X(p.b) - X(p.a)), h - 22); });
+  const step = Math.max(1, Math.floor(pts.length / (w * 1.5)));
+  x.lineWidth = 2; x.lineJoin = "round";
+  for (let i = step; i < pts.length; i += step) {
+    const a = pts[i - step], b = pts[i]; if (b.ts - a.ts > 60000 * step) continue;
+    x.strokeStyle = css(ZONES[zoneOf(b.hr)].c); x.beginPath(); x.moveTo(X(a.ts), Y(a.hr)); x.lineTo(X(b.ts), Y(b.hr)); x.stroke();
+  }
+}
+function drawBars(c, items, max, colorFn, fmt) {
+  const [x, w, h] = prep(c); if (!items.length) { x.fillStyle = css("--mut"); x.fillText("Noch keine Daten", 8, h / 2); return; }
+  const bw = (w - 4) / items.length;
+  items.forEach((it, i) => {
+    const bx = 2 + i * bw + bw * .15, bwi = bw * .7;
+    if (it.v != null) { const bh = Math.max(3, it.v / max * (h - 38)); x.fillStyle = colorFn(it.v); roundRect(x, bx, h - 16 - bh, bwi, bh, 4); x.fillStyle = css("--txt"); const t = fmt(it.v); x.fillText(t, bx + bwi / 2 - x.measureText(t).width / 2, h - 20 - bh); }
+    x.fillStyle = css("--mut"); x.fillText(it.l, bx + bwi / 2 - x.measureText(it.l).width / 2, h - 3);
+  });
+}
+function roundRect(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.lineTo(a + w, b + h); x.lineTo(a, b + h); x.arcTo(a, b, a + r, b, r); x.closePath(); x.fill(); }
+function drawHrvTrend(c, recs) {
+  const [x, w, h] = prep(c); const d = recs.filter(r => r.rmssd).slice(-30); if (d.length < 2) { x.fillStyle = css("--mut"); x.fillText("Mindestens 2 Messungen nötig", 8, h / 2); return; }
+  const vals = d.map(r => r.rmssd), lo = Math.min(...vals) * .85, hi = Math.max(...vals) * 1.1;
+  const X = i => 26 + i / (d.length - 1) * (w - 32), Y = v => 8 + (1 - (v - lo) / (hi - lo)) * (h - 26);
+  x.fillStyle = "rgba(47,210,122,.12)"; x.beginPath();
+  const bands = d.map((r, i) => { const prior = d.slice(Math.max(0, i - 7), i).map(p => Math.log(p.rmssd)); if (prior.length < 3) return null; const mu = mean(prior), sd = Math.max(std(prior), .08); return [Math.exp(mu - sd * .5), Math.exp(mu + sd * .5)]; });
+  let started = false; bands.forEach((b, i) => { if (!b) return; started ? x.lineTo(X(i), Y(b[1])) : (x.moveTo(X(i), Y(b[1])), started = true); });
+  for (let i = bands.length - 1; i >= 0; i--) if (bands[i]) x.lineTo(X(i), Y(bands[i][0]));
+  if (started) x.fill();
+  x.strokeStyle = css("--b"); x.lineWidth = 2; x.beginPath(); vals.forEach((v, i) => i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v))); x.stroke();
+  x.fillStyle = css("--mut"); x.fillText(Math.round(hi), 2, 14); x.fillText(Math.round(lo), 2, h - 18); x.fillText(dmy(d[0].ts), 26, h - 3); const e = dmy(d[d.length - 1].ts); x.fillText(e, w - x.measureText(e).width, h - 3);
+}
+
+/* ===================== Rendering ===================== */
+async function refresh() {
+  const ses = await DB.all("sessions");
+  window._recs = ses.filter(s => s.kind === "recovery").sort((a, b) => a.ts - b.ts);
+  window._trains = ses.filter(s => s.kind === "training").sort((a, b) => a.start - b.start);
+  const recs = window._recs, today = ymd(Date.now());
+  const todayRec = latestPerDay(recs).filter(r => r.date === today).pop();
+  // Heute
+  const arc = $("ringArc"), C = 2 * Math.PI * 86;
+  if (todayRec) {
+    const R = recoveryOf(todayRec, recs);
+    $("recVal").textContent = R.score != null ? R.score + "%" : "–";
+    arc.setAttribute("stroke-dasharray", `${(R.score || 0) / 100 * C} ${C}`); arc.setAttribute("stroke", recColor(R.score));
+    $("recState").textContent = recWord(R.score) + (R.calib ? ` · Kalibrierung ${Math.min(R.days, 7)}/7` : "");
+    $("recState").style.color = recColor(R.score);
+    $("hHrv").innerHTML = todayRec.rmssd ? Math.round(todayRec.rmssd) + "<small> ms</small>" : "–";
+    $("hHrvB").textContent = R.base.hrv ? `normal ${Math.round(R.base.hrvLo)}–${Math.round(R.base.hrvHi)}` : todayRec.rmssd ? "" : "keine RR-Daten";
+    $("hRhr").innerHTML = todayRec.rhr + "<small> bpm</small>";
+    $("hRhrB").textContent = R.base.rhr ? `Ø ${Math.round(R.base.rhr)}` : "";
+    $("hReco").textContent = R.score == null ? "–" : R.score >= 67 ? "Harte Einheit oder Spiel möglich. Guter Tag für Intervalle." : R.score >= 34 ? "Normales Training, Intensität nach Gefühl. Langer Lauf locker." : "Locker (Z1–2), Mobility oder Pause. Früh schlafen.";
+    $("btnMorning").textContent = "Neu messen";
+  } else {
+    $("recVal").textContent = "–"; arc.setAttribute("stroke-dasharray", `0 ${C}`); $("recState").textContent = "Noch keine Messung heute"; $("recState").style.color = "";
+    $("hHrv").textContent = "–"; $("hRhr").textContent = "–"; $("hHrvB").textContent = ""; $("hRhrB").textContent = ""; $("hReco").textContent = "Erst messen";
+    $("btnMorning").textContent = "Morgenmessung starten (3 Min.)";
+  }
+  // Tages-Strain
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const dayS = await DB.range(d0.getTime(), Date.now()); LIVE.today = dayS.length + LIVE.buf.length;
+  $("hStrain").textContent = dayS.length > 60 ? analyze(dayS, d0.getTime(), Date.now()).strain : "–";
+  // Recovery-Trend
+  const days = []; for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push(ymd(d)); }
+  const per = latestPerDay(recs);
+  drawBars($("cRecTrend"), days.map(d => { const r = per.find(x => x.date === d); return { l: d.slice(8), v: r ? recoveryOf(r, recs).score : null }; }), 100, recColor, v => v);
+  // Letztes Training
+  const lt = window._trains[window._trains.length - 1];
+  $("hLast").innerHTML = lt ? trainRow(lt) : `<span class="mut">Noch kein Training eingetragen.</span>`;
+  // Trainingsliste
+  $("tList").innerHTML = window._trains.length ? [...window._trains].reverse().map(trainRow).join("") : `<span class="mut">Noch keine.</span>`;
+  document.querySelectorAll("[data-tr]").forEach(el => el.onclick = () => openTraining(el.dataset.tr));
+  // Verlauf
+  const sd = days.map(d => ({ l: d.slice(8), v: 0 }));
+  window._trains.forEach(t => { const i = days.indexOf(t.date); if (i >= 0) sd[i].v = Math.max(sd[i].v, 0) + (t.strain || 0); });
+  sd.forEach(x => { x.v = x.v ? Math.min(21, r1(x.v)) : null; });
+  drawBars($("cStrainTrend"), sd, 21, () => css("--b"), v => v);
+  drawHrvTrend($("cHrvTrend"), per);
+  $("rList").innerHTML = per.length ? [...per].reverse().slice(0, 40).map(r => { const R = recoveryOf(r, recs); return `<div class="it"><div><b>${dmy(r.ts)}</b> <span class="mut small">${r.src}${r.sleepMin ? " · " + Math.floor(r.sleepMin / 60) + ":" + pad(r.sleepMin % 60) + " h" : ""}</span><div class="small mut">HRV ${r.rmssd ? Math.round(r.rmssd) + " ms" : "–"} · RHR ${r.rhr}</div></div><b style="color:${recColor(R.score)}">${R.score ?? "–"}%</b></div>`; }).join("") : `<span class="mut">Noch keine.</span>`;
+  $("dInfo").textContent = `${recs.length} Recovery-Messungen, ${window._trains.length} Trainings gespeichert.`;
+}
+function trainRow(t) { return `<div class="it" data-tr="${t.id}" style="cursor:pointer"><div><b>${t.type}</b><div class="small mut">${dmy(t.start)} ${hm(t.start)}–${hm(t.end)} · Ø ${t.avg || "–"} bpm · ${t.peaks ?? 0} Spitzen</div></div><div style="text-align:right"><b style="font-size:20px">${t.strain || "–"}</b><div class="small mut">Strain ›</div></div></div>`; }
+
+function go(p) { document.querySelectorAll(".page").forEach(x => x.classList.toggle("on", x.id === "p-" + p)); document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.p === p)); window.scrollTo(0, 0); if (p === "hist" || p === "heute") refresh(); }
+
+/* ===================== Demo ===================== */
+const DEMO = { on: false, timer: null, hr: 62 };
+function toggleLiveDemo() {
+  if (DEMO.on) { DEMO.on = false; clearInterval(DEMO.timer); setConn(false, "Demo beendet"); $("dLiveDemo").textContent = "Live-Demo ohne Band"; return; }
+  DEMO.on = true; setConn(true, "Demo-Daten (kein echtes Band)"); $("dLiveDemo").textContent = "Live-Demo stoppen";
+  DEMO.timer = setInterval(() => { DEMO.hr += (64 - DEMO.hr) * .05 + (Math.random() - .5) * 3; const ib = 60000 / DEMO.hr; onSample(Math.round(DEMO.hr), [Math.round(ib + (Math.random() - .5) * 90)]); }, 1000);
+  go("live");
+}
+async function makeDemo() {
+  if (!confirm("Demo-Daten für 21 Tage + Handballtraining heute 20–21 Uhr erzeugen?")) return;
+  const ses = [], now = new Date(); let base = 58;
+  for (let i = 21; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i); d.setHours(7, 10, 0, 0);
+    base += (Math.random() - .5) * 4; base = clamp(base, 45, 72);
+    ses.push({ id: "rec-demo-" + i, kind: "recovery", src: "Morgen", ts: d.getTime(), date: ymd(d), rmssd: base * (0.85 + Math.random() * .3), rhr: Math.round(54 - (base - 58) * .15 + (Math.random() - .5) * 4), demo: true });
+  }
+  // Handballtraining heute 20:00–21:00
+  const t0 = new Date(now); t0.setHours(20, 0, 0, 0); const a = t0.getTime(), b = a + 3600000, sm = [];
+  let hr = 85;
+  for (let ts = a - 300000; ts < b + 300000; ts += 1000) {
+    const m = (ts - a) / 60000; let target;
+    if (m < 0) target = 80; else if (m < 15) target = 110 + m * 2.5; else if (m < 35) target = (Math.floor(m * 2) % 5 === 0) ? 182 : 148;
+    else if (m < 45) target = 135; else if (m < 60) target = (Math.floor(m * 1.6) % 3 === 0) ? 186 : 160; else target = 95;
+    hr += (target - hr) * .12 + (Math.random() - .5) * 3; const ib = 60000 / hr;
+    sm.push({ ts, hr: Math.round(hr), rr: [Math.round(ib + (Math.random() - .5) * 20)] });
+  }
+  await DB.putMany("samples", sm);
+  const R = analyze(sm.filter(s => s.ts >= a && s.ts <= b), a, b);
+  ses.push({ id: "tr-" + a, kind: "training", type: "Handball-Training", start: a, end: b, rpe: 7, note: "Demo", date: ymd(a), strain: R.strain, avg: Math.round(R.avg), max: R.max, peaks: R.peaks.length, kcal: Math.round(R.kcal) });
+  await DB.putMany("sessions", ses); toast("Demo-Daten erzeugt"); refresh(); go("heute");
+}
+
+/* ===================== Export / Import ===================== */
+async function exportAll() {
+  await flush();
+  const data = { app: "recoverylab", v: 1, settings: S, sessions: await DB.all("sessions"), samples: await DB.all("samples") };
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = "recoverylab-backup-" + ymd(Date.now()) + ".json"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+async function importAll(file) {
+  try {
+    const d = JSON.parse(await file.text()); if (d.app !== "recoverylab") throw new Error("Kein Recovery-Lab-Backup");
+    if (d.settings) { S = Object.assign({}, DEF, d.settings); saveSet(); fillSet(); }
+    for (let i = 0; i < d.samples.length; i += 20000) await DB.putMany("samples", d.samples.slice(i, i + 20000));
+    await DB.putMany("sessions", d.sessions); toast("Import fertig"); refresh();
+  } catch (e) { toast("Import fehlgeschlagen: " + e.message, 4000); }
+}
+function fillSet() { $("sAge").value = S.age; $("sW").value = S.w; $("sSex").value = S.sex; $("sMax").value = S.max; $("sRest").value = S.rest; }
+
+/* ===================== Start ===================== */
+async function init() {
+  document.querySelectorAll("nav button").forEach(b => b.onclick = () => go(b.dataset.p));
+  $("btnConn").onclick = () => BLE.connected ? bleDisconnect() : bleConnect();
+  $("btnMorning").onclick = startMorning; $("mCancel").onclick = () => { stopMeas(); $("btnNight").textContent = "☾ Nachtmessung"; };
+  $("btnTrain").onclick = toggleTrain; $("btnNight").onclick = toggleNight;
+  $("tRpe").oninput = e => $("tRpeV").textContent = e.target.value; $("tSave").onclick = saveTraining;
+  $("tDate").value = ymd(Date.now());
+  $("shClose").onclick = () => $("sheet").classList.remove("on");
+  $("shCopy").onclick = async () => { try { await navigator.clipboard.writeText(_shText); toast("Kopiert – in den Claude-Chat einfügen"); } catch (e) { prompt("Text kopieren:", _shText); } };
+  fillSet();
+  $("sAge").onchange = () => { if (!$("sMax").dataset.touched) $("sMax").value = Math.round(208 - 0.7 * +$("sAge").value); };
+  $("sMax").oninput = () => $("sMax").dataset.touched = 1;
+  $("sSave").onclick = () => { S = { age: +$("sAge").value || 25, w: +$("sW").value || 75, sex: $("sSex").value, max: +$("sMax").value || 190, rest: $("sRest").value }; saveSet(); toast("Gespeichert"); refresh(); };
+  $("dExport").onclick = exportAll; $("dImport").onchange = e => e.target.files[0] && importAll(e.target.files[0]);
+  $("dDemo").onclick = makeDemo; $("dLiveDemo").onclick = toggleLiveDemo;
+  $("dWipe").onclick = async () => { if (confirm("Wirklich ALLE Daten löschen?") && confirm("Sicher? Das kann nicht rückgängig gemacht werden.")) { await DB.clear(); refresh(); toast("Gelöscht"); } };
+  if (!navigator.bluetooth) $("connSub").textContent = "Dieser Browser kann kein Bluetooth – auf dem iPhone in „Bluefy“ öffnen.";
+  try { await navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+  await DB.open(); await refresh();
+}
+window.addEventListener("resize", () => refresh());
+init().catch(e => toast("Startfehler: " + e.message, 5000));
+</script>
+</body>
+</html>
